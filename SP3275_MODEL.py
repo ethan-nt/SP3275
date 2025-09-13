@@ -1,4 +1,3 @@
-
 '''
 import numpy as np
 from matplotlib.animation import FuncAnimation
@@ -279,7 +278,7 @@ albedo_b = 0.25
 albedo_g = 0.5
 T_min = 278.15
 T_max = 313.15
-L_list=np.arange(0.4,1.7,0.01)
+L_list=np.arange(0.4,1.7,0.01) #luminosity range
 solar_constant = 970
 
 
@@ -310,22 +309,28 @@ def solar_declination(time):
 #         x = max(-1.0, min(1.0, x))
 #         return math.acos(x)
 
-def hour_angle(time):
-    time_in_hour = time%24
-    return math.radians(15 * time_in_hour)
 
 def eccentricity_corrector(time):
     return 1 + 0.033 * math.cos(2*math.pi * (time%365)/365)
 
-def hourly_radiation(time, latitude):
+def hour_angle_sunset(latitude, delta):
+    # latitude and delta in radians
+    cos_omega_s = -math.tan(latitude) * math.tan(delta)
+    cos_omega_s = max(-1.0, min(1.0, cos_omega_s))
+    return math.acos(cos_omega_s)
+
+def daily_radiation(time, latitude):
     latitude = math.radians(latitude)
     E_0 = eccentricity_corrector(time)
-    omega_s = hour_angle(time)
     delta = solar_declination(time)
-    # # H_0 = 24/ math.pi * solar_constant * E_0 * (omega_s * math.sin(delta) * math.sin(latitude) + 
-    #                                             math.cos(delta) * math.cos(latitude) * math.sin(omega_s))
-    I_0 = solar_constant * E_0 * (math.sin(delta) * math.sin(latitude) + math.cos(delta) * math.cos(latitude) * math.cos(omega_s))
-    return I_0
+    omega_s = hour_angle_sunset(latitude, delta)
+    # Daily mean insolation (zero at night)
+    I_0 = (solar_constant / math.pi) * E_0 * (
+        omega_s * math.sin(latitude) * math.sin(delta) +
+        math.cos(latitude) * math.cos(delta) * math.sin(omega_s)
+    )
+    # Clamp to zero if sun never rises
+    return max(I_0, 0)
 
 def area_fraction(latitude):
    latitude = math.radians(latitude)
@@ -336,23 +341,22 @@ T_p_seq = []
 A_w_seq = []
 A_b_seq = []
 for L in L_list:
-    time = 0
     A_w = 0.8
     A_b = 0.2
-    for i in range(50):
+    for time in range(365*10):
         delta_A_b = 0
         delta_A_w = 0
         T_p = 0
         for lat in range(-89, 90):
             x = 1 - A_w - A_b
             albedo_p = A_w * albedo_w + x * albedo_g + A_b * albedo_b
-            I_0 = hourly_radiation(time, lat)
+            I_0 = daily_radiation(time, lat)  # <-- use daily radiation
             area_i = area_fraction(lat)
-            T_p_i = (L * I_0 * (1 - albedo_p)/sigma)**0.25
+            T_p_i = (L * I_0 * (1 - albedo_p)/sigma)**0.25 if I_0 > 0 else 0
             T_p += T_p_i * area_i
-            print(albedo_p, T_p_i, I_0)
-            T_w = ((R * L * I_0 /sigma * (albedo_p - albedo_w)) + T_p_i**4)**0.25
-            T_b = ((R * L * I_0 / sigma * (albedo_p - albedo_b)) + T_p_i ** 4) ** 0.25
+            # print(albedo_p, T_p_i, I_0)
+            T_w = ((R * L * I_0 / sigma * (albedo_p - albedo_w)) + T_p_i**4)**0.25 if I_0 > 0 else 0
+            T_b = ((R * L * I_0 / sigma * (albedo_p - albedo_b)) + T_p_i ** 4) ** 0.25 if I_0 > 0 else 0
             if T_b <= T_max and T_b >= T_min:
                 beta_b = 1 - 0.003265 * (295.65 - T_b) ** 2
             else:
@@ -361,8 +365,8 @@ for L in L_list:
                 beta_w = 1 - 0.003265 * (295.65 - T_w)**2
             else:
                 beta_w = 0
-            delta_A_w += area_i * A_w * (x * beta_w - gamma) * timestep
-            delta_A_b += area_i * A_b * (x * beta_b - gamma) * timestep
+            delta_A_w += area_i * A_w * (x * beta_w - gamma) * 1  # timestep = 1 day
+            delta_A_b += area_i * A_b * (x * beta_b - gamma) * 1
         A_w += delta_A_w
         A_b += delta_A_b
     A_w_seq.append(A_w)
