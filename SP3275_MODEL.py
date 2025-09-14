@@ -334,7 +334,7 @@ def daily_radiation(time, latitude):
 
 def area_fraction(latitude):
    latitude = math.radians(latitude)
-   return (math.sin(latitude + 1/180 * math.pi) - math.sin(latitude))/2
+   return abs((math.sin(latitude + 1/180 * math.pi) - math.sin(latitude))/2)
 
 T_p_seq = []
 A_w_seq = []
@@ -370,9 +370,9 @@ for time in range(365*2):
     T_p_new = np.dot(T, areas)
     T_p = np.ones(180) * T_p_new
     A_w += delta_A_w
-    A_w_seq.append(A_w.mean())
+    A_w_seq.append(np.mean(A_w))
     A_b += delta_A_b
-    A_b_seq.append(A_b.mean())
+    A_b_seq.append(np.mean(A_b))
     T_p_seq.append(T_p_new)
 
 plt.plot(A_w_seq, label = 'White')
