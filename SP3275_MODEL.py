@@ -339,24 +339,24 @@ def area_fraction(latitude):
 T_p_seq = []
 A_w_seq = []
 A_b_seq = []
-A_w = [0.8] * 180
-A_b = [0.2] * 180
+A_w = np.ones(180) * 0.8
+A_b = np.ones(180) * 0.2
 T_p = 20 + K
-for time in range(365*100):
-    delta_A_b = [0] * 180
-    delta_A_w = [0] * 180
+albedo_p = np.zeros(180)
+areas = np.vectorize(area_fraction)(np.arange(0, 180))
+for time in range(365*2):
+    delta_A_b = np.zeros(180)
+    delta_A_w = np.zeros(180)
     T = np.zeros(180)
-    
     for lat in range(0, 180):
-        x = 1 - A_w - A_b
-        albedo_p = A_w * albedo_w + x * albedo_g + A_b * albedo_b
+        x = np.ones(180) - A_w - A_b
+        albedo_p[lat] = A_w[lat] * albedo_w + x[lat] * albedo_g + A_b[lat] * albedo_b
         I_0 = daily_radiation(time, lat)  # <-- use daily radiation
-        area_i = area_fraction(lat)
-        T[lat] = (I_0 * (1 - albedo_p)/sigma)**0.25
-        T_p_new += T[lat] * area_i
+        area_i = areas[lat]
+        T[lat] = (I_0 * (1 - albedo_p[lat])/sigma)**0.25
         # print(albedo_p, T_p_i, I_0)
-        T_w = ((R * I_0 / sigma * (albedo_p - albedo_w)) + T[lat] ** 4) ** 0.25
-        T_b = ((R * I_0 / sigma * (albedo_p - albedo_b)) + T[lat] ** 4) ** 0.25
+        T_w = ((R * I_0 / sigma * (albedo_p[lat] - albedo_w)) + T[lat] ** 4) ** 0.25
+        T_b = ((R * I_0 / sigma * (albedo_p[lat] - albedo_b)) + T[lat] ** 4) ** 0.25
         if T_b <= T_max and T_b >= T_min:
             beta_b = 1 - 0.003265 * (295.65 - T_b) ** 2
         else:
@@ -365,16 +365,19 @@ for time in range(365*100):
             beta_w = 1 - 0.003265 * (295.65 - T_w)**2
         else:
             beta_w = 0
-        delta_A_w += area_i * A_w * (x * beta_w - gamma) * 1  # timestep = 1 day
-        delta_A_b += area_i * A_b * (x * beta_b - gamma) * 1
+        delta_A_w[lat] += area_i * A_w[lat] * (x[lat] * beta_w - gamma) * 1  # timestep = 1 day
+        delta_A_b[lat] += area_i * A_b[lat] * (x[lat] * beta_b - gamma) * 1
+    T_p_new = np.dot(T, areas)
+    T_p = np.ones(180) * T_p_new
     A_w += delta_A_w
-    A_w_seq.append(A_w)
+    A_w_seq.append(A_w.mean())
     A_b += delta_A_b
-    A_b_seq.append(A_b)
-    T_p_seq.append(T_p)
+    A_b_seq.append(A_b.mean())
+    T_p_seq.append(T_p_new)
 
-# plt.plot(A_w_seq, label = 'White')
-# plt.plot(A_b_seq, label = 'Black')
+plt.plot(A_w_seq, label = 'White')
+plt.plot(A_b_seq, label = 'Black')
+plt.show()
 plt.plot(T_p_seq, label = 'Temperature')
 plt.legend()
 plt.show()
