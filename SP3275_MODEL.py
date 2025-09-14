@@ -267,6 +267,7 @@ class planet():
 import numpy as np
 import math
 import matplotlib.pyplot as plt
+K = 273.15
 G = 6.674e-11
 gamma = 0.3
 S_0 = 917
@@ -278,11 +279,10 @@ albedo_b = 0.25
 albedo_g = 0.5
 T_min = 278.15
 T_max = 313.15
-L_list=np.arange(0.4,1.7,0.01) #luminosity range
 solar_constant = 970
 
 
-def solar_declination(time):
+def solar_declination(time): 
     gamma = 2 * math.pi * ((time%365) - 1)/365
     return (0.006918
             - 0.399912*math.cos(gamma) + 0.070257*math.sin(gamma)
@@ -336,45 +336,45 @@ def area_fraction(latitude):
    latitude = math.radians(latitude)
    return (math.sin(latitude + 1/180 * math.pi) - math.sin(latitude))/2
 
-Area = [0] * 180
 T_p_seq = []
 A_w_seq = []
 A_b_seq = []
-for L in L_list:
-    A_w = 0.8
-    A_b = 0.2
-    for time in range(365*10):
-        delta_A_b = 0
-        delta_A_w = 0
-        T_p = 0
-        for lat in range(-89, 90):
-            x = 1 - A_w - A_b
-            albedo_p = A_w * albedo_w + x * albedo_g + A_b * albedo_b
-            I_0 = daily_radiation(time, lat)  # <-- use daily radiation
-            area_i = area_fraction(lat)
-            T_p_i = (L * I_0 * (1 - albedo_p)/sigma)**0.25 if I_0 > 0 else 0
-            T_p += T_p_i * area_i
-            # print(albedo_p, T_p_i, I_0)
-            T_w = ((R * L * I_0 / sigma * (albedo_p - albedo_w)) + T_p_i**4)**0.25 if I_0 > 0 else 0
-            T_b = ((R * L * I_0 / sigma * (albedo_p - albedo_b)) + T_p_i ** 4) ** 0.25 if I_0 > 0 else 0
-            if T_b <= T_max and T_b >= T_min:
-                beta_b = 1 - 0.003265 * (295.65 - T_b) ** 2
-            else:
-                beta_b = 0
-            if T_w <= T_max and T_w >= T_min:
-                beta_w = 1 - 0.003265 * (295.65 - T_w)**2
-            else:
-                beta_w = 0
-            delta_A_w += area_i * A_w * (x * beta_w - gamma) * 1  # timestep = 1 day
-            delta_A_b += area_i * A_b * (x * beta_b - gamma) * 1
-        A_w += delta_A_w
-        A_b += delta_A_b
+A_w = [0.8] * 180
+A_b = [0.2] * 180
+T_p = 20 + K
+for time in range(365*100):
+    delta_A_b = [0] * 180
+    delta_A_w = [0] * 180
+    T = np.zeros(180)
+    
+    for lat in range(0, 180):
+        x = 1 - A_w - A_b
+        albedo_p = A_w * albedo_w + x * albedo_g + A_b * albedo_b
+        I_0 = daily_radiation(time, lat)  # <-- use daily radiation
+        area_i = area_fraction(lat)
+        T[lat] = (I_0 * (1 - albedo_p)/sigma)**0.25
+        T_p_new += T[lat] * area_i
+        # print(albedo_p, T_p_i, I_0)
+        T_w = ((R * I_0 / sigma * (albedo_p - albedo_w)) + T[lat] ** 4) ** 0.25
+        T_b = ((R * I_0 / sigma * (albedo_p - albedo_b)) + T[lat] ** 4) ** 0.25
+        if T_b <= T_max and T_b >= T_min:
+            beta_b = 1 - 0.003265 * (295.65 - T_b) ** 2
+        else:
+            beta_b = 0
+        if T_w <= T_max and T_w >= T_min:
+            beta_w = 1 - 0.003265 * (295.65 - T_w)**2
+        else:
+            beta_w = 0
+        delta_A_w += area_i * A_w * (x * beta_w - gamma) * 1  # timestep = 1 day
+        delta_A_b += area_i * A_b * (x * beta_b - gamma) * 1
+    A_w += delta_A_w
     A_w_seq.append(A_w)
+    A_b += delta_A_b
     A_b_seq.append(A_b)
     T_p_seq.append(T_p)
 
-# plt.plot(L_list, A_w_seq, label = 'White')
-# plt.plot(L_list, A_b_seq, label = 'Black')
-plt.plot(L_list, T_p_seq, label = 'Temperature')
+# plt.plot(A_w_seq, label = 'White')
+# plt.plot(A_b_seq, label = 'Black')
+plt.plot(T_p_seq, label = 'Temperature')
 plt.legend()
 plt.show()
